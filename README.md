@@ -17,6 +17,10 @@ below for how a scan type plugs in.
 `router_screenshot` itself is OS-agnostic (Playwright works cross-platform), but the project as a
 whole targets Linux; there's no macOS/Windows scanner planned and no reason to expect one.
 
+This README is a quick-start overview — see [`docs/`](docs/README.md) for a full option-by-option
+reference on every scan type, the offline vendor-identification database, the REST API, and how
+the `ScanRunner` plugin architecture works.
+
 ## Safety model
 
 This drives a *real* router's admin interface, so the crawler is built to be structurally
