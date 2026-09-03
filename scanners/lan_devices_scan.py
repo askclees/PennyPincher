@@ -39,7 +39,7 @@ from scanners.lan_devices_parse import (  # noqa: E402
 MAX_HOSTS = 2048  # safety cap — bigger than a /22 (this tool's own dev network), well short of a /16
 PING_CONCURRENCY = 64
 DNS_TIMEOUT_SECONDS = 1
-CSV_FIELDNAMES = ["ip", "mac", "hostname"]
+CSV_FIELDNAMES = ["ip", "mac", "vendor", "hostname"]
 
 
 def run(cmd):

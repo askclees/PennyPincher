@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scanners.bluetooth_parse import normalize_device  # noqa: E402
 
-CSV_FIELDNAMES = ["address", "name", "rssi", "manufacturer_ids", "service_uuids"]
+CSV_FIELDNAMES = ["address", "name", "vendor", "rssi", "manufacturer_ids", "service_uuids"]
 
 
 async def scan(duration, adapter=None):
