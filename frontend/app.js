@@ -371,13 +371,15 @@ const TABLE_COLUMNS = {
   bluetooth_scan: [
     { label: "Address", render: (d) => d.address || "" },
     { label: "Name", render: (d) => d.name || "(unnamed)" },
+    { label: "Vendor", render: (d) => d.vendor || "" },
     { label: "RSSI", render: (d) => (d.rssi != null ? `${d.rssi} dBm` : "") },
-    { label: "Manufacturer", render: (d) => (d.manufacturer_ids || []).join(", ") },
+    { label: "Manufacturer ID", render: (d) => (d.manufacturer_ids || []).join(", ") },
     { label: "Service UUIDs", render: (d) => (d.service_uuids || []).join(", ") },
   ],
   network_devices_scan: [
     { label: "IP", render: (d) => d.ip || "" },
     { label: "MAC", render: (d) => d.mac || "" },
+    { label: "Vendor", render: (d) => d.vendor || "" },
     { label: "Hostname", render: (d) => d.hostname || "" },
   ],
 };

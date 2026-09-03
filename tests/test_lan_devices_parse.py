@@ -96,8 +96,13 @@ class HostsInSubnetTests(unittest.TestCase):
 
 class NormalizeDeviceTests(unittest.TestCase):
     def test_normalizes(self):
+        # aa:bb:cc isn't a real registered OUI, so vendor is expected to be None here — the
+        # vendor lookup itself is covered by test_vendor_lookup.py.
         device = normalize_device("192.168.1.5", "aa:bb:cc:dd:ee:ff", "printer.local")
-        self.assertEqual(device, {"ip": "192.168.1.5", "mac": "aa:bb:cc:dd:ee:ff", "hostname": "printer.local"})
+        self.assertEqual(
+            device,
+            {"ip": "192.168.1.5", "mac": "aa:bb:cc:dd:ee:ff", "hostname": "printer.local", "vendor": None},
+        )
 
     def test_missing_hostname_becomes_none(self):
         device = normalize_device("192.168.1.5", "aa:bb:cc:dd:ee:ff")

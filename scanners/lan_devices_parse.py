@@ -6,6 +6,7 @@ nmcli_parse.py's role for the WiFi scan itself.
 import ipaddress
 
 from .nmcli_parse import split_terse_line
+from .vendor_lookup import lookup_mac_vendor
 
 _TRUTHY = ("*", "yes", "true")
 
@@ -69,4 +70,4 @@ def hosts_in_subnet(ip_with_prefix, exclude=()):
 
 
 def normalize_device(ip, mac, hostname=None):
-    return {"ip": ip, "mac": mac, "hostname": hostname or None}
+    return {"ip": ip, "mac": mac, "hostname": hostname or None, "vendor": lookup_mac_vendor(mac)}

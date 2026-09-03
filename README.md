@@ -53,7 +53,8 @@ etc.):
 ```
 backend/    FastAPI app — REST API, site/scan orchestration, serves the frontend
 crawler/    Scrapy + scrapy-playwright project — the router_screenshot scan type's implementation
-scanners/   Standalone scripts (no Scrapy) — the wifi_scan and bluetooth_scan implementations
+scanners/   Standalone scripts (no Scrapy) — wifi_scan, bluetooth_scan, network_devices_scan, and
+            the bundled local vendor-lookup databases (scanners/data/)
 frontend/   Static HTML/JS/CSS single-page app
 data/       Gitignored — data/sites/<site_id>/scans/<scan_id>/{status.json, manifest.json, artifacts/}
 tests/      Unit tests, no live router, WiFi/Bluetooth adapter, or GUI required
@@ -127,7 +128,7 @@ silently returning zero networks.
 
 Pick "Bluetooth Scan" as the scan type — a duration (seconds, default 15) and an optional adapter
 name (e.g. `hci0`). It scans continuously for that duration via `bleak` (BlueZ over D-Bus) and
-shows results as a table (address, name, RSSI, manufacturer ID, service UUIDs) sorted
+shows results as a table (address, name, vendor, RSSI, manufacturer ID, service UUIDs) sorted
 strongest-first. Export includes a `devices.csv` alongside `manifest.json`.
 
 Requires `bluetoothd` (BlueZ) running with a working adapter — `systemctl status bluetooth` to
@@ -139,7 +140,8 @@ scan fails with bleak's D-Bus error rather than hanging or silently returning ze
 
 Not a directly-selectable scan type in the New Scan form — instead, open a completed `wifi_scan`'s
 results and click "Scan devices" on a specific network's row. That starts a
-`network_devices_scan` targeting that SSID and shows a table of what it finds (IP, MAC, hostname).
+`network_devices_scan` targeting that SSID and shows a table of what it finds (IP, MAC, vendor,
+hostname).
 
 You have to actually be joined to that WiFi network first (this scans the local subnet you're
 currently on — it can't reach out to some other network you merely detected). The scan checks
@@ -154,6 +156,34 @@ to reach it triggers that regardless of whether the ping itself gets a reply. No
 sockets needed, unlike `arp-scan`/`nmap`'s ARP-scan mode. Hostnames are filled in via a best-effort
 reverse DNS lookup per device (works when a router's DHCP integrates with local DNS, which many
 consumer routers do; otherwise left blank). Export includes a `devices.csv`.
+
+### Vendor identification (offline)
+
+`bluetooth_scan` and `network_devices_scan` results both include a **Vendor** column — resolved
+entirely from two local databases bundled in `scanners/data/` (`oui_prefixes.json`,
+~53,800 IEEE-registered MAC prefixes; `bluetooth_company_ids.json`, ~4,000 Bluetooth SIG company
+IDs). **No network access at scan time** — `scanners/vendor_lookup.py` only ever reads these
+already-built JSON files. For a MAC address, this matches its OUI prefix (trying IEEE's 36-bit,
+28-bit, then 24-bit registries in that order, longest match wins) against the vendor that
+registered it; a locally-administered/randomized address (the U/L bit set on the first octet —
+common for BLE privacy addresses) is correctly reported as unresolvable rather than guessed, since
+by definition no vendor registered it. For Bluetooth, this looks up the advertisement's
+manufacturer company ID directly.
+
+This resolves **manufacturer**, not exact model — "TP-Link Systems Inc." or "Apple, Inc.", not
+"Archer AX55" or "iPhone 14". Getting to a specific model reliably generally needs either a cloud
+fingerprint database or protocol-level fingerprinting (DHCP options, mDNS records, BLE GATT
+services) — a meaningfully harder problem than a static lookup table, and not implemented here.
+
+Both files were built from official public sources (IEEE's own MA-L/MA-M/MA-S OUI registries;
+Bluetooth SIG's company identifiers, via Nordic Semiconductor's BSD-3-Clause-licensed
+`bluetooth-numbers-database` mirror) and are periodically-stale by nature — new OUI/company ID
+assignments happen continuously. To refresh them (this is the *only* thing in this repo that
+calls the network, and it's a manual step you run yourself, never automatic):
+
+```
+python3 scanners/build_vendor_db.py
+```
 
 ## Testing
 
@@ -186,6 +216,10 @@ python3 -m unittest discover tests -v
   `ip neighbor` discovery technique itself was verified against a real live subnet during
   development (real hosts, real MACs, zero root needed) — that part isn't something a unit test
   can exercise without real network access, so it isn't re-asserted here.
+- `test_vendor_lookup.py` — the offline MAC/Bluetooth vendor lookups, against the real bundled
+  data files (so this also catches a broken/missing data file, not just logic bugs) using
+  well-known stable values (e.g. Apple's `00:03:93` OUI and Bluetooth company ID 76), plus the
+  locally-administered-address exclusion and longest-prefix-match preference.
 
 For an end-to-end check, run the backend and a small local page (or router) that has a login form
 and a couple of linked pages, submit a scan through the GUI, and confirm the gallery + export
