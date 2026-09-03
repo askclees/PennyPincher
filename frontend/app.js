@@ -310,10 +310,14 @@ async function renderScanView(siteId, scanId) {
   const exportButton = el("button", { class: "secondary", onclick: () => window.open(exportLink.href, "_blank") }, [document.createTextNode("Export as .zip")]);
   app.appendChild(exportButton);
 
-  const results = await api("GET", `/sites/${siteId}/scans/${scanId}/results`);
+  let results = await api("GET", `/sites/${siteId}/scans/${scanId}/results`);
   if (!results.length) {
     app.appendChild(el("p", { class: "empty", text: EMPTY_LABELS[scan.scan_type] || "No pages captured." }));
     return;
+  }
+
+  if (scan.scan_type === "wifi_scan") {
+    results = groupWifiNetworksBySsid(results);
   }
 
   const columns = TABLE_COLUMNS[scan.scan_type];
@@ -322,6 +326,42 @@ async function renderScanView(siteId, scanId) {
   } else {
     app.appendChild(renderGallery(siteId, scanId, results));
   }
+}
+
+// Dual-band routers and mesh systems commonly broadcast one SSID across several access points
+// (different BSSID/channel each) — shown separately that reads as "duplicates" of the same
+// network. This groups the results table by SSID for display only; the underlying manifest/CSV
+// export keeps full per-access-point detail, since an unexpected extra AP for a known SSID can
+// itself be a signal worth seeing (e.g. a rogue/evil-twin AP), not just clutter to hide.
+function groupWifiNetworksBySsid(networks) {
+  const groups = new Map();
+  for (const n of networks) {
+    // A hidden SSID can't be meaningfully grouped with other hidden networks, so each one (keyed
+    // by its own BSSID) stays its own row rather than collapsing unrelated networks together.
+    const key = n.ssid || ` hidden:${n.bssid}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(n);
+  }
+
+  const strongestFirst = (a, b) => (b.signal ?? -Infinity) - (a.signal ?? -Infinity);
+  const uniqueDefined = (values) => [...new Set(values.filter((v) => v != null))];
+
+  return Array.from(groups.values()).map((group) => {
+    const sorted = [...group].sort(strongestFirst);
+    const strongest = sorted[0];
+    const channels = uniqueDefined(group.map((n) => n.channel));
+    const frequencies = uniqueDefined(group.map((n) => n.frequency));
+    return {
+      ssid: strongest.ssid,
+      bssid: strongest.bssid,
+      apCount: group.length,
+      signal: strongest.signal,
+      channel: channels.length === 1 ? channels[0] : channels.join(", "),
+      frequency: frequencies.length === 1 ? frequencies[0] : frequencies.join(", "),
+      security: strongest.security,
+      in_use: group.some((n) => n.in_use),
+    };
+  });
 }
 
 const COUNT_LABELS = {
@@ -360,7 +400,7 @@ function scanDevicesButton(network, context) {
 const TABLE_COLUMNS = {
   wifi_scan: [
     { label: "SSID", render: (n) => n.ssid || "(hidden)" },
-    { label: "BSSID", render: (n) => n.bssid || "" },
+    { label: "BSSID", render: (n) => (n.apCount > 1 ? `${n.bssid} (+${n.apCount - 1} more)` : n.bssid || "") },
     { label: "Signal", render: (n) => (n.signal != null ? `${n.signal}%` : "") },
     { label: "Channel", render: (n) => (n.channel != null ? String(n.channel) : "") },
     { label: "Frequency", render: (n) => n.frequency || "" },

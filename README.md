@@ -118,6 +118,14 @@ walking around a site while it runs), and shows results as a table (SSID, BSSID,
 security) sorted strongest-first. Export includes a `networks.csv` alongside `manifest.json` for
 opening in a spreadsheet.
 
+The results table is grouped by SSID for display — dual-band routers and mesh systems commonly
+broadcast one SSID across several access points (different BSSID/channel each), which otherwise
+reads as the same network showing up multiple times. The table shows the strongest AP's
+BSSID/signal per group (with a "(+N more)" note when there's more than one); the underlying
+`manifest.json`/`networks.csv` keep every access point as its own row, full detail intact — an
+unexpected extra AP for a known SSID can itself be worth noticing (a rogue/evil-twin AP), not
+just clutter to collapse away permanently.
+
 Requires `nmcli` (part of NetworkManager — already present on most desktop Linux distros). This is
 inherently a passive/read-only operation — listening for beacon frames can't mutate anything on
 any network — so none of the router crawler's click-safety machinery is relevant here. If `nmcli`
