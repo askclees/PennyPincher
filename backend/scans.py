@@ -88,6 +88,71 @@ def list_scans(site_id):
     return [get_scan_status(site_id, p.name) for p in sorted(scans_dir.iterdir())]
 
 
+# Field that identifies "the same network/device" across separate scans of a given type, for
+# AGGREGATE_KEYS below.
+AGGREGATE_KEYS = {
+    "wifi_scan": "bssid",
+    "bluetooth_scan": "address",
+}
+
+# Mirrors each scan type's own within-scan sort (strongest-signal-first) — merged rows carry
+# whichever scan's reading is freshest, so sorting by that field the same way still reads
+# naturally once merged.
+_AGGREGATE_SORT_KEYS = {
+    "wifi_scan": lambda row: (row.get("signal") is None, -(row.get("signal") or 0)),
+    "bluetooth_scan": lambda row: (row.get("rssi") is None, -(row.get("rssi") or -999)),
+}
+
+
+def get_aggregate(site_id, scan_type):
+    """Merges every completed scan of `scan_type` at a site into one deduplicated list — e.g.
+    "every WiFi network ever seen here across all WiFi scans", not just one scan's results.
+    Dedup key is scan-type-specific (AGGREGATE_KEYS); each row also gets first_seen_at/
+    last_seen_at (that key's earliest/latest contributing scan's started_at) and times_seen (how
+    many separate scans contained it) — otherwise, a row's fields are whichever scan saw it most
+    recently, since that's the freshest read on it.
+    """
+    key_field = AGGREGATE_KEYS.get(scan_type)
+    if key_field is None:
+        raise ValueError(f"aggregation isn't supported for scan_type {scan_type!r}")
+
+    scans_dir = SITES_DIR / site_id / "scans"
+    if not scans_dir.exists():
+        return []
+
+    merged = {}
+    # Directory names are scan_ids (UTC timestamps), so a plain sort is chronological order —
+    # iterating oldest-to-newest means each key's fields naturally end up as its latest reading.
+    for scan_path in sorted(scans_dir.iterdir()):
+        status_file = scan_path / "status.json"
+        manifest_file = scan_path / "manifest.json"
+        if not status_file.exists() or not manifest_file.exists():
+            continue
+
+        status = json.loads(status_file.read_text())
+        if status.get("scan_type") != scan_type or status.get("status") != "done":
+            continue
+        scan_time = status.get("started_at")
+
+        for row in json.loads(manifest_file.read_text()):
+            key = row.get(key_field)
+            if not key:
+                continue
+            if key not in merged:
+                merged[key] = {**row, "first_seen_at": scan_time, "last_seen_at": scan_time, "times_seen": 1}
+            else:
+                entry = merged[key]
+                entry.update(row)
+                entry["last_seen_at"] = scan_time
+                entry["times_seen"] += 1
+
+    rows = list(merged.values())
+    sort_key = _AGGREGATE_SORT_KEYS.get(scan_type)
+    if sort_key:
+        rows.sort(key=sort_key)
+    return rows
+
+
 def get_manifest(site_id, scan_id):
     manifest_file = _scan_dir(site_id, scan_id) / "manifest.json"
     if not manifest_file.exists():

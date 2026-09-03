@@ -42,6 +42,9 @@ function parseRoute() {
   if (parts[0] === "site" && parts[1] && parts[2] === "scan" && parts[3]) {
     return { view: "scan", siteId: parts[1], scanId: parts[3] };
   }
+  if (parts[0] === "site" && parts[1] && parts[2] === "all" && parts[3]) {
+    return { view: "aggregate", siteId: parts[1], scanType: parts[3] };
+  }
   if (parts[0] === "site" && parts[1]) {
     return { view: "site", siteId: parts[1] };
   }
@@ -55,6 +58,7 @@ async function render() {
     if (route.view === "sites") await renderSitesView();
     else if (route.view === "site") await renderSiteView(route.siteId);
     else if (route.view === "scan") await renderScanView(route.siteId, route.scanId);
+    else if (route.view === "aggregate") await renderAggregateView(route.siteId, route.scanType);
   } catch (err) {
     app.appendChild(el("div", { class: "error-box", text: err.message }));
   }
@@ -147,6 +151,23 @@ async function renderSiteView(siteId) {
     }
   }
   app.appendChild(listPanel);
+
+  // "Master list" — every network/device seen across ALL scans of a type at this site, not just
+  // one scan's results. Only offered once there's at least one completed scan of that type.
+  const AGGREGATE_TYPES = [
+    { type: "wifi_scan", label: "All WiFi networks seen at this site" },
+    { type: "bluetooth_scan", label: "All Bluetooth devices seen at this site" },
+  ];
+  const available = AGGREGATE_TYPES.filter((t) =>
+    scanList.some((s) => s.scan_type === t.type && s.status === "done"));
+  if (available.length) {
+    const aggPanel = el("div", { class: "panel" });
+    aggPanel.appendChild(el("h2", { text: "Master lists" }));
+    for (const { type, label } of available) {
+      aggPanel.appendChild(el("p", {}, [el("a", { href: `#/site/${siteId}/all/${type}`, text: label })]));
+    }
+    app.appendChild(aggPanel);
+  }
 }
 
 function buildNewScanForm(siteId) {
@@ -361,7 +382,7 @@ function groupWifiNetworksBySsid(networks) {
     const strongest = sorted[0];
     const channels = uniqueDefined(group.map((n) => n.channel));
     const frequencies = uniqueDefined(group.map((n) => n.frequency));
-    return {
+    const result = {
       ssid: strongest.ssid,
       bssid: strongest.bssid,
       apCount: group.length,
@@ -371,7 +392,47 @@ function groupWifiNetworksBySsid(networks) {
       security: strongest.security,
       in_use: group.some((n) => n.in_use),
     };
+    // Provenance fields only exist on master-list (cross-scan) rows — combine them sensibly
+    // across the group when present; a plain single-scan view's rows won't have them, so this is
+    // a no-op there. times_seen is a max, not a sum: a single scan commonly sees the same SSID
+    // on more than one band/AP at once, so summing each AP's own times_seen would double-count.
+    if (group.some((n) => n.first_seen_at != null)) {
+      result.first_seen_at = group.map((n) => n.first_seen_at).filter(Boolean).sort()[0];
+      result.last_seen_at = group.map((n) => n.last_seen_at).filter(Boolean).sort().slice(-1)[0];
+      result.times_seen = Math.max(...group.map((n) => n.times_seen || 0));
+    }
+    return result;
   });
+}
+
+// ---- Master list (aggregate) view --------------------------------------
+
+async function renderAggregateView(siteId, scanType) {
+  app.appendChild(el("p", {}, [el("a", { href: `#/site/${siteId}`, text: "← Back to site" })]));
+  const title = scanType === "bluetooth_scan" ? "Bluetooth devices" : "WiFi networks";
+  app.appendChild(el("h2", { text: `All ${title} seen at this site` }));
+  app.appendChild(el("p", {
+    class: "meta",
+    text: "Merged across every completed scan of this type at this site.",
+  }));
+
+  let results = await api("GET", `/sites/${siteId}/aggregate/${scanType}`);
+  if (!results.length) {
+    app.appendChild(el("p", { class: "empty", text: "Nothing found yet — run a scan first." }));
+    return;
+  }
+
+  if (scanType === "wifi_scan") {
+    results = groupWifiNetworksBySsid(results);
+  }
+
+  const columns = (TABLE_COLUMNS[scanType] || []).concat([
+    { label: "First Seen", render: (r) => r.first_seen_at || "" },
+    { label: "Last Seen", render: (r) => r.last_seen_at || "" },
+    { label: "Times Seen", render: (r) => (r.times_seen != null ? String(r.times_seen) : "") },
+  ]);
+
+  app.appendChild(renderTable(results, columns, { siteId }));
 }
 
 const COUNT_LABELS = {

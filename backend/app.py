@@ -55,6 +55,16 @@ def list_scans(site_id: str):
     return scans.list_scans(site_id)
 
 
+@app.get("/sites/{site_id}/aggregate/{scan_type}")
+def get_site_aggregate(site_id: str, scan_type: str):
+    if sites.get_site(site_id) is None:
+        raise HTTPException(404, "site not found")
+    try:
+        return scans.get_aggregate(site_id, scan_type)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
 @app.get("/sites/{site_id}/scans/{scan_id}", response_model=ScanResponse)
 def get_scan(site_id: str, scan_id: str):
     status = scans.get_scan_status(site_id, scan_id)

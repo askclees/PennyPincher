@@ -52,3 +52,13 @@ more. `artifacts/devices.csv` is the same rows, for opening in a spreadsheet.
 [Vendor lookup](../vendor-lookup.md) for how the local database works and its limits (manufacturer,
 not exact model). If a device advertises multiple manufacturer IDs, they're tried in ascending
 order and the first one that resolves wins.
+
+## Master list — every device seen across all Bluetooth scans at a site
+
+A single scan only shows what was in range during that run. The site page has an "All Bluetooth
+devices seen at this site" link (once at least one `bluetooth_scan` there has completed) that
+merges **every** completed Bluetooth scan at the site into one table, deduplicated by `address` —
+plus First Seen, Last Seen, and Times Seen columns (see
+[API reference](../api-reference.md#get-sitessite_idaggregatescan_type) for exactly how those are
+computed). Useful for telling a device that's only ever passed through once from one that's
+consistently present at the site.

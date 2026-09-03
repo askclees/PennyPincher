@@ -83,3 +83,14 @@ Every network row in a completed scan's results has a "Scan devices" button (hid
 no SSID — a hidden network can't be targeted this way). Clicking it starts a
 [`network_devices_scan`](network-devices-scan.md) for that SSID at the same site. You need to
 actually be joined to that network first — see that doc for why and what happens if you aren't.
+
+## Master list — every network seen across all WiFi scans at a site
+
+A single scan only shows what was visible during that run. The site page has an "All WiFi
+networks seen at this site" link (once at least one `wifi_scan` there has completed) that merges
+**every** completed WiFi scan at the site into one deduplicated table — so if you've scanned the
+same site 3 times, you see everything found across all 3, not just the most recent run. Same
+SSID-grouping as a single scan's table applies, plus three extra columns: First Seen, Last Seen,
+Times Seen (how many separate scans found it — see [API reference](../api-reference.md#get-sitessite_idaggregatescan_type)
+for exactly how these are computed). Useful for spotting something that only ever showed up once
+(transient, or possibly a rogue AP) versus a network that's consistently present.

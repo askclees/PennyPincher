@@ -73,6 +73,24 @@ the time this returns; `status` will normally be `"running"`:
 
 Returns `ScanResponse[]` for a site, in scan_id (creation) order.
 
+### `GET /sites/{site_id}/aggregate/{scan_type}`
+
+The "master list" — merges every **completed** (`status: "done"`) scan of `scan_type` at this
+site into one deduplicated list, so if you've run 3 `bluetooth_scan`s here, this returns every
+device seen across all 3, not just one scan's results. Only `wifi_scan` (deduped by `bssid`) and
+`bluetooth_scan` (deduped by `address`) support this — any other `scan_type` (including
+`router_screenshot` and `network_devices_scan`) returns `400`. `404` if the site doesn't exist.
+
+Each row has the same fields as that scan type's normal results, plus:
+
+| Field | Description |
+|---|---|
+| `first_seen_at` | The earliest contributing scan's `started_at` for this network/device. |
+| `last_seen_at` | The most recent contributing scan's `started_at`. |
+| `times_seen` | How many separate scans contained it. All other fields (signal, vendor, etc.) reflect whichever scan saw it most recently — the freshest read. |
+
+Sorted the same way each scan type sorts on its own (strongest signal/RSSI first).
+
 ### `GET /sites/{site_id}/scans/{scan_id}`
 
 Returns one `ScanResponse` — poll this while `status` is `"running"`/`"pending"`. `status`
