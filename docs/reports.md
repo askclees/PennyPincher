@@ -24,7 +24,7 @@ uses the latest crawl's results as-is.
 
 | | HTML | Markdown |
 |---|---|---|
-| Screenshots | Embedded as base64 `data:` URIs — one self-contained file, opens anywhere, no separate assets to keep track of | Not embedded — Markdown doesn't render those portably across viewers/tools. The screenshots table still lists every page's title + URL; get the actual images from the HTML report or that scan's own "Export as .zip" |
+| Screenshots | Embedded as base64 `data:` URIs — one self-contained file, opens anywhere, no separate assets to keep track of. Click any thumbnail to open it full-size in a lightbox (prev/next arrows, arrow keys, Escape to close) — all inline JS, no external dependencies | Not embedded — Markdown doesn't render those portably across viewers/tools. The screenshots table still lists every page's title + URL; get the actual images from the HTML report or that scan's own "Export as .zip" |
 | Styling | Matches the app's dark theme | Plain tables — pastes cleanly into docs/tickets/wikis |
 | Typical size | Can be several MB for a large `router_screenshot` scan (proportional to how many pages × screenshot size) | A few KB — just text |
 
@@ -42,7 +42,9 @@ there) can break out of its table cell/caption. Verified directly in
 
 `tests/test_report.py` covers both generators against a temporary data directory (an empty site,
 a site with a real screenshot artifact — asserting its exact base64 encoding appears in the HTML
-output — a site with cross-scan-deduplicated master-list data, and the HTML-escaping /
-Markdown-pipe-escaping checks above). No live router or GUI needed. The reports shown in this doc's
+output — a site with cross-scan-deduplicated master-list data, the HTML-escaping /
+Markdown-pipe-escaping checks above, and that the lightbox markup only appears when there's
+actually a gallery to show it for). No live router or GUI needed. The reports shown in this doc's
 description were additionally verified against a real router scan during development — a genuine
-~1.8MB, 22-screenshot HTML report that rendered correctly in a real browser.
+~1.8MB, 22-screenshot HTML report that rendered correctly in a real browser, including clicking
+through the lightbox (open, next/prev with wraparound, Escape to close).

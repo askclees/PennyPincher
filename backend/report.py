@@ -82,9 +82,80 @@ th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid #2a2
 th { color: #9aa1ac; font-size: 0.78rem; text-transform: uppercase; }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; margin-top: 1rem; }
 .gallery figure { margin: 0; background: #171a21; border: 1px solid #2a2e37; border-radius: 8px; overflow: hidden; }
-.gallery img { width: 100%; display: block; border-bottom: 1px solid #2a2e37; }
+.gallery img { width: 100%; display: block; border-bottom: 1px solid #2a2e37; cursor: zoom-in; }
 .gallery figcaption { padding: 0.6rem 0.75rem; font-size: 0.8rem; }
 .gallery figcaption .url { color: #9aa1ac; word-break: break-all; }
+"""
+
+# Only appended when there's at least one router screenshot — no point shipping lightbox CSS/JS
+# in a report that has no gallery to light up. Vanilla JS, no external dependencies (the report
+# is a single portable file, so this can't rely on anything the app itself ships). All images are
+# already fully embedded as base64 in the gallery thumbnails, so "opening" one full-size needs no
+# extra data, just displaying the same src larger. Mirrors the app's own lightbox (open/close,
+# prev/next, arrow keys).
+_LIGHTBOX_HTML = """
+<style>
+#lightbox-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; padding: 2rem; cursor: zoom-out; z-index: 10; }
+#lightbox-content { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; max-width: 100%; max-height: 100%; cursor: default; }
+#lightbox-content img { max-width: 100%; max-height: 80vh; border-radius: 4px; display: block; }
+#lightbox-caption { color: #e6e8eb; font-size: 0.85rem; text-align: center; }
+#lightbox-close { position: absolute; top: 1rem; right: 1.5rem; background: none; border: none; color: #e6e8eb; font-size: 2rem; line-height: 1; cursor: pointer; padding: 0.25rem 0.5rem; }
+#lightbox-prev, #lightbox-next { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.08); border: 1px solid #2a2e37; color: #e6e8eb; font-size: 2rem; line-height: 1; width: 3rem; height: 3rem; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+#lightbox-prev:hover, #lightbox-next:hover { background: rgba(255,255,255,0.16); }
+#lightbox-prev { left: 1rem; }
+#lightbox-next { right: 1rem; }
+</style>
+<div id="lightbox-overlay">
+  <button id="lightbox-close">&times;</button>
+  <button id="lightbox-prev">&lsaquo;</button>
+  <div id="lightbox-content"><img id="lightbox-img" src="" alt=""><div id="lightbox-caption"></div></div>
+  <button id="lightbox-next">&rsaquo;</button>
+</div>
+<script>
+(function () {
+  var images = Array.prototype.map.call(document.querySelectorAll(".gallery img"), function (img) {
+    return { src: img.getAttribute("src"), alt: img.getAttribute("alt") || "" };
+  });
+  if (!images.length) return;
+
+  var current = 0;
+  var overlay = document.getElementById("lightbox-overlay");
+  var imgEl = document.getElementById("lightbox-img");
+  var caption = document.getElementById("lightbox-caption");
+
+  function show(i) {
+    current = (i + images.length) % images.length;
+    imgEl.src = images[current].src;
+    caption.textContent = (current + 1) + " / " + images.length + (images[current].alt ? " — " + images[current].alt : "");
+  }
+  function open(i) {
+    show(i);
+    overlay.style.display = "flex";
+    document.addEventListener("keydown", onKeydown);
+  }
+  function close() {
+    overlay.style.display = "none";
+    document.removeEventListener("keydown", onKeydown);
+  }
+  function onKeydown(e) {
+    if (e.key === "Escape") close();
+    else if (e.key === "ArrowRight") show(current + 1);
+    else if (e.key === "ArrowLeft") show(current - 1);
+  }
+  function stop(fn) {
+    return function (e) { e.stopPropagation(); fn(); };
+  }
+
+  document.querySelectorAll(".gallery img").forEach(function (img, i) {
+    img.addEventListener("click", function () { open(i); });
+  });
+  overlay.addEventListener("click", close);
+  document.getElementById("lightbox-content").addEventListener("click", function (e) { e.stopPropagation(); });
+  document.getElementById("lightbox-close").addEventListener("click", stop(close));
+  document.getElementById("lightbox-prev").addEventListener("click", stop(function () { show(current - 1); }));
+  document.getElementById("lightbox-next").addEventListener("click", stop(function () { show(current + 1); }));
+})();
+</script>
 """
 
 
@@ -146,6 +217,8 @@ def generate_html_report(site_id):
     parts.append(_html_table(data["bluetooth"], BLUETOOTH_COLUMNS))
     parts.append(f"<h2>Network Devices ({len(data['devices'])})</h2>")
     parts.append(_html_table(data["devices"], NETWORK_DEVICE_COLUMNS))
+    if data["router_pages"]:
+        parts.append(_LIGHTBOX_HTML)
     parts.append("</body></html>")
 
     return "\n".join(parts)

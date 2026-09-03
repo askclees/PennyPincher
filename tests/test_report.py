@@ -74,6 +74,16 @@ class ReportTests(unittest.TestCase):
         self.assertIn("data:image/png;base64,", html)
         import base64
         self.assertIn(base64.b64encode(fake_png).decode("ascii"), html)
+        # The lightbox is what makes those base64-embedded thumbnails actually viewable at full
+        # size — it's otherwise easy to forget to wire up since it's pure client-side JS with no
+        # server-side rendering to catch a typo in the id it hooks onto.
+        self.assertIn('id="lightbox-overlay"', html)
+        self.assertIn('querySelectorAll(".gallery img")', html)
+
+    def test_no_lightbox_markup_when_no_screenshots(self):
+        site_id = self._make_site("2b No Screenshots Ln")
+        html = report.generate_html_report(site_id)
+        self.assertNotIn("lightbox-overlay", html)
 
     def test_html_escapes_untrusted_looking_content(self):
         site_id = self._make_site("3 XSS Ave", notes="<script>alert(1)</script>")
