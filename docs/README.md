@@ -16,6 +16,8 @@ Detailed, per-feature reference. If you just want to get running, see the main
 
 - [Vendor lookup](vendor-lookup.md) — the offline MAC/Bluetooth manufacturer database used by the
   Bluetooth and Network Devices scans.
+- [Site reports](reports.md) — a standalone HTML or Markdown summary of everything found at a
+  site, for sharing or filing outside the app.
 - [Architecture](architecture.md) — the Sites → Scans data model, the `ScanRunner` plugin
   interface, and how to add a new scan type.
 - [API reference](api-reference.md) — the REST endpoints the frontend (and anything else) talks

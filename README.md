@@ -197,6 +197,14 @@ calls the network, and it's a manual step you run yourself, never automatic):
 python3 scanners/build_vendor_db.py
 ```
 
+## Site reports
+
+A site's page has "Download HTML report" / "Download Markdown report" once at least one scan
+there has completed — a standalone summary (router screenshots from the latest scan, plus the
+full WiFi/Bluetooth/network-device master lists) for sharing or filing outside the app. The HTML
+version embeds screenshots as base64, so it's one self-contained file. See
+[docs/reports.md](docs/reports.md) for the full breakdown.
+
 ## Testing
 
 No live router or running server needed for the unit tests:
@@ -232,6 +240,16 @@ python3 -m unittest discover tests -v
   data files (so this also catches a broken/missing data file, not just logic bugs) using
   well-known stable values (e.g. Apple's `00:03:93` OUI and Bluetooth company ID 76), plus the
   locally-administered-address exclusion and longest-prefix-match preference.
+- `test_csv_fieldnames.py` — a regression test asserting each scanner's `CSV_FIELDNAMES` exactly
+  matches its `normalize_*()` output keys (a real bug: `vendor` was added to two scanners'
+  normalized records without their CSV writer's field list being updated to match, which crashed
+  the scan — after `manifest.json` had already been written correctly — the moment it got to a row
+  with that field).
+- `test_aggregate.py` — the site-wide "master list" merge/dedup logic (`backend/scans.py::
+  get_aggregate()`), against a temp data directory with fabricated multi-scan data.
+- `test_report.py` — the HTML/Markdown site report generators, including that a real screenshot's
+  exact base64 encoding appears in the HTML output and that untrusted-looking content (site notes,
+  titles) is properly escaped rather than injected as raw markup.
 
 For an end-to-end check, run the backend and a small local page (or router) that has a login form
 and a couple of linked pages, submit a scan through the GUI, and confirm the gallery + export

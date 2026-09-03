@@ -88,19 +88,34 @@ def list_scans(site_id):
     return [get_scan_status(site_id, p.name) for p in sorted(scans_dir.iterdir())]
 
 
+def latest_scan(site_id, scan_type):
+    """The most recently *completed* scan of a type at a site, or None. Directory names are
+    scan_ids (UTC timestamps), so iterating newest-first is a plain reverse sort."""
+    scans_dir = SITES_DIR / site_id / "scans"
+    if not scans_dir.exists():
+        return None
+    for scan_path in sorted(scans_dir.iterdir(), reverse=True):
+        status = get_scan_status(site_id, scan_path.name)
+        if status and status.get("scan_type") == scan_type and status.get("status") == "done":
+            return status
+    return None
+
+
 # Field that identifies "the same network/device" across separate scans of a given type, for
 # AGGREGATE_KEYS below.
 AGGREGATE_KEYS = {
     "wifi_scan": "bssid",
     "bluetooth_scan": "address",
+    "network_devices_scan": "mac",
 }
 
-# Mirrors each scan type's own within-scan sort (strongest-signal-first) — merged rows carry
-# whichever scan's reading is freshest, so sorting by that field the same way still reads
-# naturally once merged.
+# Mirrors each scan type's own within-scan sort (strongest-signal-first, or numeric IP order) —
+# merged rows carry whichever scan's reading is freshest, so sorting by that field the same way
+# still reads naturally once merged.
 _AGGREGATE_SORT_KEYS = {
     "wifi_scan": lambda row: (row.get("signal") is None, -(row.get("signal") or 0)),
     "bluetooth_scan": lambda row: (row.get("rssi") is None, -(row.get("rssi") or -999)),
+    "network_devices_scan": lambda row: tuple(int(p) for p in row.get("ip", "0.0.0.0").split(".")),
 }
 
 

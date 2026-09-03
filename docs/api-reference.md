@@ -77,9 +77,15 @@ Returns `ScanResponse[]` for a site, in scan_id (creation) order.
 
 The "master list" — merges every **completed** (`status: "done"`) scan of `scan_type` at this
 site into one deduplicated list, so if you've run 3 `bluetooth_scan`s here, this returns every
-device seen across all 3, not just one scan's results. Only `wifi_scan` (deduped by `bssid`) and
-`bluetooth_scan` (deduped by `address`) support this — any other `scan_type` (including
-`router_screenshot` and `network_devices_scan`) returns `400`. `404` if the site doesn't exist.
+device seen across all 3, not just one scan's results. Supported for `wifi_scan` (deduped by
+`bssid`), `bluetooth_scan` (deduped by `address`), and `network_devices_scan` (deduped by `mac`)
+— any other `scan_type` (i.e. `router_screenshot`, which has no meaningful cross-scan identity to
+dedup on) returns `400`. `404` if the site doesn't exist.
+
+Only `wifi_scan` and `bluetooth_scan` get a "Master lists" link on the site page in the GUI (since
+`network_devices_scan` isn't itself directly launchable there — see its own doc) — but its
+aggregate is still used by the [site report](reports.md)'s Network Devices section, and reachable
+directly via this endpoint regardless.
 
 Each row has the same fields as that scan type's normal results, plus:
 
@@ -90,6 +96,13 @@ Each row has the same fields as that scan type's normal results, plus:
 | `times_seen` | How many separate scans contained it. All other fields (signal, vendor, etc.) reflect whichever scan saw it most recently — the freshest read. |
 
 Sorted the same way each scan type sorts on its own (strongest signal/RSSI first).
+
+### `GET /sites/{site_id}/report/html` and `GET /sites/{site_id}/report/markdown`
+
+A standalone site report — see [Site reports](reports.md) for exactly what's in it. Returned as
+an actual file download (`Content-Disposition: attachment`, filename
+`{site_id}-report.html`/`.md`), generated fresh on each request rather than cached. `404` if the
+site doesn't exist.
 
 ### `GET /sites/{site_id}/scans/{scan_id}`
 

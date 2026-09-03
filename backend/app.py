@@ -2,10 +2,10 @@ from pathlib import Path
 from typing import List
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import scans, sites
+from . import report, scans, sites
 from .models import ScanCreateRequest, ScanResponse, SiteCreateRequest, SiteResponse
 
 app = FastAPI(title="PennyPincher")
@@ -63,6 +63,26 @@ def get_site_aggregate(site_id: str, scan_type: str):
         return scans.get_aggregate(site_id, scan_type)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+
+
+@app.get("/sites/{site_id}/report/html", response_class=HTMLResponse)
+def get_site_report_html(site_id: str):
+    try:
+        content = report.generate_html_report(site_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc))
+    headers = {"Content-Disposition": f'attachment; filename="{site_id}-report.html"'}
+    return HTMLResponse(content, headers=headers)
+
+
+@app.get("/sites/{site_id}/report/markdown", response_class=PlainTextResponse)
+def get_site_report_markdown(site_id: str):
+    try:
+        content = report.generate_markdown_report(site_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc))
+    headers = {"Content-Disposition": f'attachment; filename="{site_id}-report.md"'}
+    return PlainTextResponse(content, headers=headers)
 
 
 @app.get("/sites/{site_id}/scans/{scan_id}", response_model=ScanResponse)

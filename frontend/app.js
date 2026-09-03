@@ -168,6 +168,28 @@ async function renderSiteView(siteId) {
     }
     app.appendChild(aggPanel);
   }
+
+  // Site report — a standalone HTML or Markdown summary (router screenshot gallery + the WiFi/
+  // Bluetooth/network-device master lists), for sharing or filing outside the app. Only offered
+  // once there's something to report on.
+  if (scanList.some((s) => s.status === "done")) {
+    const reportPanel = el("div", { class: "panel" });
+    reportPanel.appendChild(el("h2", { text: "Report" }));
+    reportPanel.appendChild(el("p", {
+      class: "meta",
+      text: "Router screenshots from the latest scan, plus the full WiFi/Bluetooth/network-device master lists.",
+    }));
+    reportPanel.appendChild(el("button", {
+      text: "Download HTML report",
+      onclick: () => window.open(`/sites/${siteId}/report/html`, "_blank"),
+    }));
+    reportPanel.appendChild(el("button", {
+      class: "secondary",
+      text: "Download Markdown report",
+      onclick: () => window.open(`/sites/${siteId}/report/markdown`, "_blank"),
+    }));
+    app.appendChild(reportPanel);
+  }
 }
 
 function buildNewScanForm(siteId) {
