@@ -3,7 +3,7 @@ const app = document.getElementById("app");
 const SCAN_TYPES = [
   { value: "router_screenshot", label: "Router Screenshot" },
   { value: "wifi_scan", label: "WiFi Scan" },
-  // bluetooth_scan will be added here once its runner exists server-side.
+  { value: "bluetooth_scan", label: "Bluetooth Scan" },
 ];
 
 async function api(method, path, body) {
@@ -148,13 +148,15 @@ function buildNewScanForm(siteId) {
 
   const routerFields = el("div");
   const wifiFields = el("div");
+  const bluetoothFields = el("div");
   form.appendChild(routerFields);
   form.appendChild(wifiFields);
+  form.appendChild(bluetoothFields);
 
   const syncFieldVisibility = () => {
-    const isWifi = typeSelect.value === "wifi_scan";
-    routerFields.style.display = isWifi ? "none" : "";
-    wifiFields.style.display = isWifi ? "" : "none";
+    routerFields.style.display = typeSelect.value === "router_screenshot" ? "" : "none";
+    wifiFields.style.display = typeSelect.value === "wifi_scan" ? "" : "none";
+    bluetoothFields.style.display = typeSelect.value === "bluetooth_scan" ? "" : "none";
   };
   typeSelect.addEventListener("change", syncFieldVisibility);
 
@@ -219,6 +221,18 @@ function buildNewScanForm(siteId) {
       "useful if walking around a site while it runs. Linux only, via nmcli.",
   }));
 
+  const btDuration = el("input", { type: "number", value: "15", min: "1" });
+  const btAdapter = el("input", { placeholder: "e.g. hci0 (optional — defaults to bleak's own choice)" });
+  bluetoothFields.appendChild(el("label", { text: "Scan duration (seconds)" }));
+  bluetoothFields.appendChild(btDuration);
+  bluetoothFields.appendChild(el("label", { text: "Bluetooth adapter" }));
+  bluetoothFields.appendChild(btAdapter);
+  bluetoothFields.appendChild(el("p", {
+    class: "meta",
+    text: "Scans continuously for the given duration via bleak (BlueZ over D-Bus). Linux only, " +
+      "and needs bluetoothd running with a working adapter.",
+  }));
+
   syncFieldVisibility();
 
   const errorBox = el("div", { class: "error-box", style: "display:none" });
@@ -234,6 +248,9 @@ function buildNewScanForm(siteId) {
         if (typeSelect.value === "wifi_scan") {
           params = { duration: Number(duration.value) || 15 };
           if (interfaceInput.value.trim()) params.interface = interfaceInput.value.trim();
+        } else if (typeSelect.value === "bluetooth_scan") {
+          params = { duration: Number(btDuration.value) || 15 };
+          if (btAdapter.value.trim()) params.adapter = btAdapter.value.trim();
         } else {
           params = {
             router_url: routerUrl.value.trim(),
@@ -271,7 +288,7 @@ async function renderScanView(siteId, scanId) {
 
   const scan = await api("GET", `/sites/${siteId}/scans/${scanId}`);
 
-  const countLabel = scan.scan_type === "wifi_scan" ? "network(s) found" : "page(s) captured";
+  const countLabel = COUNT_LABELS[scan.scan_type] || "page(s) captured";
   app.appendChild(el("p", {}, [el("a", { href: `#/site/${siteId}`, text: "← Back to site" })]));
   app.appendChild(el("h2", {}, [document.createTextNode(`${scan.scan_type} `), statusPill(scan.status)]));
   app.appendChild(el("p", { class: "meta", text: `Started ${scan.started_at}${scan.page_count != null ? ` · ${scan.page_count} ${countLabel}` : ""}` }));
@@ -292,16 +309,46 @@ async function renderScanView(siteId, scanId) {
 
   const results = await api("GET", `/sites/${siteId}/scans/${scanId}/results`);
   if (!results.length) {
-    app.appendChild(el("p", { class: "empty", text: scan.scan_type === "wifi_scan" ? "No networks found." : "No pages captured." }));
+    app.appendChild(el("p", { class: "empty", text: EMPTY_LABELS[scan.scan_type] || "No pages captured." }));
     return;
   }
 
-  if (scan.scan_type === "wifi_scan") {
-    app.appendChild(renderNetworkTable(results));
+  const columns = TABLE_COLUMNS[scan.scan_type];
+  if (columns) {
+    app.appendChild(renderTable(results, columns));
   } else {
     app.appendChild(renderGallery(siteId, scanId, results));
   }
 }
+
+const COUNT_LABELS = {
+  wifi_scan: "network(s) found",
+  bluetooth_scan: "device(s) found",
+};
+
+const EMPTY_LABELS = {
+  wifi_scan: "No networks found.",
+  bluetooth_scan: "No devices found.",
+};
+
+const TABLE_COLUMNS = {
+  wifi_scan: [
+    { label: "SSID", render: (n) => n.ssid || "(hidden)" },
+    { label: "BSSID", render: (n) => n.bssid || "" },
+    { label: "Signal", render: (n) => (n.signal != null ? `${n.signal}%` : "") },
+    { label: "Channel", render: (n) => (n.channel != null ? String(n.channel) : "") },
+    { label: "Frequency", render: (n) => n.frequency || "" },
+    { label: "Security", render: (n) => n.security || "Open" },
+    { label: "In Use", render: (n) => (n.in_use ? "✓" : "") },
+  ],
+  bluetooth_scan: [
+    { label: "Address", render: (d) => d.address || "" },
+    { label: "Name", render: (d) => d.name || "(unnamed)" },
+    { label: "RSSI", render: (d) => (d.rssi != null ? `${d.rssi} dBm` : "") },
+    { label: "Manufacturer", render: (d) => (d.manufacturer_ids || []).join(", ") },
+    { label: "Service UUIDs", render: (d) => (d.service_uuids || []).join(", ") },
+  ],
+};
 
 function renderGallery(siteId, scanId, pages) {
   const gallery = el("div", { class: "gallery" });
@@ -320,24 +367,14 @@ function renderGallery(siteId, scanId, pages) {
   return gallery;
 }
 
-function renderNetworkTable(networks) {
+function renderTable(rows, columns) {
   const table = el("table", { class: "network-table" });
-  const headerRow = el("tr", {}, [
-    "SSID", "BSSID", "Signal", "Channel", "Frequency", "Security", "In Use",
-  ].map((label) => el("th", { text: label })));
+  const headerRow = el("tr", {}, columns.map((c) => el("th", { text: c.label })));
   table.appendChild(el("thead", {}, [headerRow]));
 
   const tbody = el("tbody");
-  for (const n of networks) {
-    tbody.appendChild(el("tr", {}, [
-      el("td", { text: n.ssid || "(hidden)" }),
-      el("td", { text: n.bssid || "" }),
-      el("td", { text: n.signal != null ? `${n.signal}%` : "" }),
-      el("td", { text: n.channel != null ? String(n.channel) : "" }),
-      el("td", { text: n.frequency || "" }),
-      el("td", { text: n.security || "Open" }),
-      el("td", { text: n.in_use ? "✓" : "" }),
-    ]));
+  for (const row of rows) {
+    tbody.appendChild(el("tr", {}, columns.map((c) => el("td", { text: c.render(row) }))));
   }
   table.appendChild(tbody);
   return table;

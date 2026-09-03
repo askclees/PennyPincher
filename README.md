@@ -6,10 +6,15 @@ same tool gets run at multiple locations. A web frontend lets you enter an addre
 capture with live credentials (never stored to disk), watch it run, browse the resulting
 screenshots (each captioned with the URL it came from), and export everything as a zip.
 
-Router "scans" are one of several **scan types** at a site. A `wifi_scan` type (nearby WiFi
-networks, via `nmcli` on Linux) is also implemented; a future `bluetooth_scan` can be added the
-same way — the architecture doesn't need to change to add scan types beyond the URL-crawling
-model. See "Extending with new scan types" below.
+Router screenshotting is one of three **scan types** available at a site — `wifi_scan` (nearby
+WiFi networks) and `bluetooth_scan` (nearby BLE devices) round out a full on-site survey, both via
+the same Sites → Scans model and results/export UI. See "Extending with new scan types" below for
+how a scan type plugs in.
+
+**Linux only, by design, with no plans to change.** `wifi_scan` shells out to `nmcli`
+(NetworkManager) and `bluetooth_scan` uses `bleak` over BlueZ's D-Bus API — both Linux-specific.
+`router_screenshot` itself is OS-agnostic (Playwright works cross-platform), but the project as a
+whole targets Linux; there's no macOS/Windows scanner planned and no reason to expect one.
 
 ## Safety model
 
@@ -46,10 +51,10 @@ etc.):
 ```
 backend/    FastAPI app — REST API, site/scan orchestration, serves the frontend
 crawler/    Scrapy + scrapy-playwright project — the router_screenshot scan type's implementation
-scanners/   Standalone scripts (no Scrapy) — the wifi_scan scan type's implementation
+scanners/   Standalone scripts (no Scrapy) — the wifi_scan and bluetooth_scan implementations
 frontend/   Static HTML/JS/CSS single-page app
 data/       Gitignored — data/sites/<site_id>/scans/<scan_id>/{status.json, manifest.json, artifacts/}
-tests/      Unit tests, no live router, WiFi adapter, or GUI required
+tests/      Unit tests, no live router, WiFi/Bluetooth adapter, or GUI required
 ```
 
 **Sites → Scans.** A *Site* is a physical address (created by typing it into the GUI, or reused if
@@ -110,11 +115,23 @@ walking around a site while it runs), and shows results as a table (SSID, BSSID,
 security) sorted strongest-first. Export includes a `networks.csv` alongside `manifest.json` for
 opening in a spreadsheet.
 
-Linux only for now (`nmcli`, part of NetworkManager — already present on most desktop Linux
-distros). This is inherently a passive/read-only operation — listening for beacon frames can't
-mutate anything on any network — so none of the router crawler's click-safety machinery is
-relevant here. If `nmcli` reports no WiFi adapter (or isn't installed at all), the scan fails with
-that message rather than silently returning zero networks.
+Requires `nmcli` (part of NetworkManager — already present on most desktop Linux distros). This is
+inherently a passive/read-only operation — listening for beacon frames can't mutate anything on
+any network — so none of the router crawler's click-safety machinery is relevant here. If `nmcli`
+reports no WiFi adapter (or isn't installed at all), the scan fails with that message rather than
+silently returning zero networks.
+
+### Bluetooth scanning
+
+Pick "Bluetooth Scan" as the scan type — a duration (seconds, default 15) and an optional adapter
+name (e.g. `hci0`). It scans continuously for that duration via `bleak` (BlueZ over D-Bus) and
+shows results as a table (address, name, RSSI, manufacturer ID, service UUIDs) sorted
+strongest-first. Export includes a `devices.csv` alongside `manifest.json`.
+
+Requires `bluetoothd` (BlueZ) running with a working adapter — `systemctl status bluetooth` to
+check. Same passive/read-only reasoning as WiFi scanning applies: nothing here can mutate a
+discovered device, it's listening for advertisements only. If no adapter/daemon is reachable, the
+scan fails with bleak's D-Bus error rather than hanging or silently returning zero devices.
 
 ## Testing
 
@@ -139,6 +156,9 @@ python3 -m unittest discover tests -v
   needed — `scanners/wifi_scan.py` can also be run directly
   (`python3 scanners/wifi_scan.py --scan-dir /tmp/x --duration 5`) to sanity-check the full
   scan/dedup/manifest-writing loop even on a machine with zero visible networks.
+- `test_bluetooth_parse.py` — the Bluetooth scan's device-record normalizer (manufacturer ID hex
+  formatting, missing-data defaults). No real adapter needed — `scanners/bluetooth_scan.py` can
+  likewise be run directly to sanity-check the full loop.
 
 For an end-to-end check, run the backend and a small local page (or router) that has a login form
 and a couple of linked pages, submit a scan through the GUI, and confirm the gallery + export
@@ -152,17 +172,9 @@ as long as it writes `manifest.json` and any output files into `scan_dir/artifac
 in `backend/runners/__init__.py`'s `RUNNERS` map and add an entry to `SCAN_TYPES` in
 `frontend/app.js` — no other backend or frontend code needs to change.
 
-`wifi_scan` (`backend/runners/wifi_scan.py` + `scanners/wifi_scan.py`) is a second, simpler
-example of the same pattern — unlike `router_screenshot`, it scans from the machine physically
-present at the site rather than a remote URL, and needs no Scrapy/Playwright at all, just a
-subprocess repeatedly shelling out to `nmcli`.
-
-Planned future scan types, not yet implemented:
-
-- **`bluetooth_scan`** — nearby Bluetooth/BLE device discovery (e.g. via `bluetoothctl`/`bleak`).
-  Needs its own design pass for what library to use, what OS permissions it needs, and what its
-  `manifest.json` shape should record.
-- **WiFi/Bluetooth scanning on macOS/Windows** — `wifi_scan` is Linux-only (`nmcli`) for now;
-  Windows (`netsh wlan show networks`) and macOS (increasingly restricted by Apple without extra
-  app entitlements) would each be their own `ScanRunner`, selected by `platform.system()` or a
-  separate registered scan type.
+`wifi_scan` and `bluetooth_scan` (`backend/runners/{wifi,bluetooth}_scan.py` +
+`scanners/{wifi,bluetooth}_scan.py`) are two examples of the same pattern beyond
+`router_screenshot` — both scan from the machine physically present at the site rather than a
+remote URL, and need no Scrapy/Playwright at all, just a subprocess shelling out to `nmcli`/bleak
+respectively. A future scan type follows the same shape: a runner + a script, registered in one
+place, no changes needed to `backend/sites.py`, `backend/scans.py`, or the frontend shell.
