@@ -257,3 +257,22 @@ A scan type also doesn't have to be directly selectable in the New Scan form's d
 results (`frontend/app.js`'s `scanDevicesButton`), since it only makes sense once you know which
 SSID to target. `SCAN_TYPES` controls what shows up in that dropdown; a runner registered in
 `RUNNERS` without a `SCAN_TYPES` entry is simply launched some other way in the UI.
+
+## Releasing a new version
+
+The `VERSION` file at the repo root is the single source of truth — `backend/app.py` reads it at
+startup and serves it at `GET /version`; the frontend header fetches that on load and shows it
+next to the title. To cut a release:
+
+```
+# 1. bump the VERSION file (semver: MAJOR.MINOR.PATCH — PATCH for a fix, MINOR for a new
+#    feature, MAJOR only for a breaking change), then commit it
+git commit -am "Bump version to X.Y.Z"
+
+# 2. tag and push
+git tag vX.Y.Z
+git push origin main vX.Y.Z
+
+# 3. let GitHub write the release notes from the commits since the last tag
+gh release create vX.Y.Z --generate-notes
+```

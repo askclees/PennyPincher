@@ -11,6 +11,13 @@ from .models import ScanCreateRequest, ScanResponse, SiteCreateRequest, SiteResp
 app = FastAPI(title="PennyPincher")
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+VERSION_FILE = Path(__file__).resolve().parent.parent / "VERSION"
+VERSION = VERSION_FILE.read_text().strip() if VERSION_FILE.exists() else "unknown"
+
+
+@app.get("/version")
+def get_version():
+    return {"version": VERSION}
 
 
 @app.post("/sites", response_model=SiteResponse)

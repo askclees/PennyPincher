@@ -60,8 +60,18 @@ async function render() {
   }
 }
 
+async function renderVersion() {
+  try {
+    const { version } = await api("GET", "/version");
+    document.getElementById("version").textContent = `v${version}`;
+  } catch {
+    // non-essential — leave the badge blank rather than breaking the page over it
+  }
+}
+
 window.addEventListener("hashchange", render);
 window.addEventListener("DOMContentLoaded", render);
+window.addEventListener("DOMContentLoaded", renderVersion);
 
 // ---- Sites view ---------------------------------------------------------
 
