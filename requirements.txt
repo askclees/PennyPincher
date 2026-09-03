@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic
+scrapy>=2.13  # router_spider.py uses the async Spider.start() entry point added in 2.13
+scrapy-playwright
+playwright
+
+# After installing, download a browser binary for Playwright once:
+#   playwright install chromium

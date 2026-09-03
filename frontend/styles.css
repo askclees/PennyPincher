@@ -1,0 +1,170 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --border: #2a2e37;
+  --text: #e6e8eb;
+  --muted: #9aa1ac;
+  --accent: #4f8cff;
+  --accent-text: #0b0f14;
+  --danger: #e0575b;
+  --ok: #3fb97f;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+header {
+  padding: 1.5rem 2rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+header h1 { margin: 0; font-size: 1.4rem; }
+header h1 a { color: var(--text); text-decoration: none; }
+.tagline { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.9rem; }
+
+main { max-width: 960px; margin: 0 auto; padding: 1.5rem 2rem 4rem; }
+
+h2 { font-size: 1.1rem; margin-top: 0; }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0.75rem 0 0.25rem;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #0d0f13;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+button {
+  margin-top: 1rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+button:disabled { opacity: 0.5; cursor: default; }
+
+.list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.list-item:last-child { border-bottom: none; }
+.list-item a { color: var(--text); text-decoration: none; font-weight: 500; }
+.list-item a:hover { color: var(--accent); }
+.list-item .meta { color: var(--muted); font-size: 0.85rem; }
+
+.status-pill {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.status-pill.running { background: #3a3410; color: #e8c93f; }
+.status-pill.done { background: #103a24; color: var(--ok); }
+.status-pill.error { background: #3a1315; color: var(--danger); }
+.status-pill.pending { background: #22262f; color: var(--muted); }
+
+.advanced summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; margin-top: 0.75rem; }
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.gallery figure {
+  margin: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.gallery img {
+  width: 100%;
+  display: block;
+  border-bottom: 1px solid var(--border);
+  cursor: zoom-in;
+}
+
+.gallery figcaption { padding: 0.6rem 0.75rem; font-size: 0.8rem; }
+.gallery figcaption .title { font-weight: 600; display: block; margin-bottom: 0.15rem; }
+.gallery figcaption .url { color: var(--muted); word-break: break-all; }
+
+.network-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.9rem;
+}
+.network-table th, .network-table td {
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.network-table th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+.network-table tbody tr:last-child td { border-bottom: none; }
+.network-table tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
+
+.error-box {
+  background: #2a1214;
+  border: 1px solid var(--danger);
+  color: #ffb4b6;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  cursor: zoom-out;
+}
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: 4px; }
+
+.empty { color: var(--muted); font-style: italic; }
