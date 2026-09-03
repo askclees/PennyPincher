@@ -20,11 +20,14 @@ class RouterSpider(scrapy.Spider):
     page's rendered HTML. This spider never submits a form other than the login form (see
     auth/), so it cannot trigger a Reboot/Factory-Reset/Apply action via a settings form.
 
-    Optionally (options.click_nav = true), it also explores onClick-driven nav/sidebar buttons —
-    common in React/Vue admin UIs that don't use real links for navigation — but only ones that
-    pass a conservative filter (click_filter.py: not a form-submit control, not inside a <form>,
-    label doesn't match a danger-keyword list) AND with every non-GET network request blocked for
-    the duration of the click, so even a wrong filter guess can't reach the router as a mutation.
+    It also explores onClick-driven nav/sidebar buttons by default (options.click_nav = true
+    unless explicitly disabled) — common in React/Vue admin UIs that don't use real links for
+    navigation, and often the only way to reach most of a router's settings pages (verified: one
+    real router only exposed 3 of 22 reachable pages via real links alone). Only buttons that
+    pass a conservative filter are ever clicked (click_filter.py: not a form-submit control, not
+    inside a <form>, label doesn't match a danger-keyword list) AND every non-GET network request
+    is blocked for the duration of the click, so even a wrong filter guess can't reach the router
+    as a mutation.
 
     The whole crawl happens on a single Playwright Page/browser tab rather than one Scrapy
     Request (and therefore one fresh Playwright Page) per link. Some admin UIs keep their auth
@@ -51,7 +54,7 @@ class RouterSpider(scrapy.Spider):
 
         options = json.loads(os.environ.get("PENNYPINCHER_OPTIONS", "{}"))
         self.max_pages = int(options.pop("max_pages", 200))
-        self.click_nav = bool(options.pop("click_nav", False))
+        self.click_nav = bool(options.pop("click_nav", True))
         self.auth = strategy_cls(
             username=os.environ["PENNYPINCHER_USERNAME"],
             password=os.environ["PENNYPINCHER_PASSWORD"],

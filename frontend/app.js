@@ -171,7 +171,7 @@ function buildNewScanForm(siteId) {
   const usernameSel = el("input", { placeholder: "e.g. #username (optional)" });
   const passwordSel = el("input", { placeholder: "e.g. input[type=password] (optional)" });
   const submitSel = el("input", { placeholder: "e.g. button#login (optional)" });
-  const clickNav = el("input", { type: "checkbox" });
+  const clickNav = el("input", { type: "checkbox", checked: true });
 
   routerFields.appendChild(el("label", { text: "Router URL" }));
   routerFields.appendChild(routerUrl);
@@ -196,9 +196,10 @@ function buildNewScanForm(siteId) {
   const clickNavLabel = el("label", {}, [
     clickNav,
     document.createTextNode(
-      " Also explore nav/sidebar buttons, not just links (for admin UIs whose settings pages" +
-      " aren't real links) — still never clicks anything labeled like a destructive action, and" +
-      " blocks all non-GET requests during exploration as a hard backstop"
+      " Explore nav/sidebar buttons, not just links (on by default — most routers hide settings" +
+      " pages behind these) — never clicks anything labeled like a destructive action, and" +
+      " blocks all non-GET requests during exploration as a hard backstop. Uncheck to restrict" +
+      " the crawl to real links only."
     ),
   ]);
   clickNavLabel.style.display = "flex";
@@ -258,11 +259,13 @@ function buildNewScanForm(siteId) {
             username: username.value,
             password: password.value,
             max_pages: Number(maxPages.value) || 200,
+            // Explicit true/false, not conditionally included — the backend defaults to true
+            // when this key is omitted, so an unchecked box must still send click_nav: false.
+            click_nav: clickNav.checked,
           };
           if (usernameSel.value.trim()) params.username_selector = usernameSel.value.trim();
           if (passwordSel.value.trim()) params.password_selector = passwordSel.value.trim();
           if (submitSel.value.trim()) params.submit_selector = submitSel.value.trim();
-          if (clickNav.checked) params.click_nav = true;
         }
 
         const scan = await api("POST", `/sites/${siteId}/scans`, { scan_type: typeSelect.value, params });

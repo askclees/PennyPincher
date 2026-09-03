@@ -29,11 +29,12 @@ etc.):
   external "support" link, for example.
 - A max-pages safety cap (`options.max_pages`, default 200) bounds runaway crawls from link
   cycles or huge nav menus.
-- **Optional nav-button exploration** (`options.click_nav`, default off). Some admin UIs
-  (React/Vue SPAs especially) implement their settings navigation with onClick-driven buttons
-  instead of real links, which the link-only crawl above structurally cannot see. When enabled,
-  the crawler also explores nav/sidebar buttons — but with two independent safety layers, not
-  just one (`crawler/pennypincher_crawler/click_filter.py`):
+- **Nav-button exploration** (`options.click_nav`, default **on**). Some admin UIs (React/Vue
+  SPAs especially) implement their settings navigation with onClick-driven buttons instead of
+  real links, which the link-only crawl above structurally cannot see — on one real router,
+  real links alone reached only 3 of 22 actual settings pages, the rest sitting behind sidebar
+  accordion buttons. So this runs by default, but with two independent safety layers, not just
+  one (`crawler/pennypincher_crawler/click_filter.py`):
   1. **Filter before clicking**: only considers buttons inside a nav/sidebar landmark, never a
      `type=submit` control, never anything inside a `<form>`, and never anything whose label
      matches a broad danger-keyword list (reboot, reset, delete, apply, save, firmware, etc).
@@ -43,8 +44,8 @@ etc.):
      verified with a decoy "Sync Now" button that actually fires a POST on click; the POST is
      aborted and the button's true target never sees it.
   This still shares one limitation with the link-only crawl: a *GET*-based destructive endpoint
-  (bad API design, but it exists on some devices) isn't caught by the non-GET block. Off by
-  default for that reason — turn it on deliberately per scan in the Advanced section.
+  (bad API design, but it exists on some devices) isn't caught by the non-GET block. Uncheck it
+  in the Advanced section (or pass `click_nav: false`) to restrict a scan to real links only.
 
 ## Architecture
 
