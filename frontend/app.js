@@ -318,7 +318,7 @@ async function renderScanView(siteId, scanId) {
 
   const columns = TABLE_COLUMNS[scan.scan_type];
   if (columns) {
-    app.appendChild(renderTable(results, columns));
+    app.appendChild(renderTable(results, columns, { siteId }));
   } else {
     app.appendChild(renderGallery(siteId, scanId, results));
   }
@@ -327,12 +327,35 @@ async function renderScanView(siteId, scanId) {
 const COUNT_LABELS = {
   wifi_scan: "network(s) found",
   bluetooth_scan: "device(s) found",
+  network_devices_scan: "device(s) found",
 };
 
 const EMPTY_LABELS = {
   wifi_scan: "No networks found.",
   bluetooth_scan: "No devices found.",
+  network_devices_scan: "No devices found on this network.",
 };
+
+function scanDevicesButton(network, context) {
+  if (!network.ssid) return "—"; // can't target a hidden/unnamed network by SSID
+  return el("button", {
+    class: "secondary",
+    text: "Scan devices",
+    onclick: async (e) => {
+      e.target.disabled = true;
+      try {
+        const scan = await api("POST", `/sites/${context.siteId}/scans`, {
+          scan_type: "network_devices_scan",
+          params: { ssid: network.ssid, bssid: network.bssid },
+        });
+        location.hash = `#/site/${context.siteId}/scan/${scan.scan_id}`;
+      } catch (err) {
+        alert(`Couldn't start scan: ${err.message}`);
+        e.target.disabled = false;
+      }
+    },
+  });
+}
 
 const TABLE_COLUMNS = {
   wifi_scan: [
@@ -343,6 +366,7 @@ const TABLE_COLUMNS = {
     { label: "Frequency", render: (n) => n.frequency || "" },
     { label: "Security", render: (n) => n.security || "Open" },
     { label: "In Use", render: (n) => (n.in_use ? "✓" : "") },
+    { label: "", render: scanDevicesButton },
   ],
   bluetooth_scan: [
     { label: "Address", render: (d) => d.address || "" },
@@ -350,6 +374,11 @@ const TABLE_COLUMNS = {
     { label: "RSSI", render: (d) => (d.rssi != null ? `${d.rssi} dBm` : "") },
     { label: "Manufacturer", render: (d) => (d.manufacturer_ids || []).join(", ") },
     { label: "Service UUIDs", render: (d) => (d.service_uuids || []).join(", ") },
+  ],
+  network_devices_scan: [
+    { label: "IP", render: (d) => d.ip || "" },
+    { label: "MAC", render: (d) => d.mac || "" },
+    { label: "Hostname", render: (d) => d.hostname || "" },
   ],
 };
 
@@ -370,14 +399,17 @@ function renderGallery(siteId, scanId, pages) {
   return gallery;
 }
 
-function renderTable(rows, columns) {
+function renderTable(rows, columns, context = {}) {
   const table = el("table", { class: "network-table" });
   const headerRow = el("tr", {}, columns.map((c) => el("th", { text: c.label })));
   table.appendChild(el("thead", {}, [headerRow]));
 
   const tbody = el("tbody");
   for (const row of rows) {
-    tbody.appendChild(el("tr", {}, columns.map((c) => el("td", { text: c.render(row) }))));
+    tbody.appendChild(el("tr", {}, columns.map((c) => {
+      const value = c.render(row, context);
+      return value instanceof Node ? el("td", {}, [value]) : el("td", { text: value });
+    })));
   }
   table.appendChild(tbody);
   return table;

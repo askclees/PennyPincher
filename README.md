@@ -6,10 +6,11 @@ same tool gets run at multiple locations. A web frontend lets you enter an addre
 capture with live credentials (never stored to disk), watch it run, browse the resulting
 screenshots (each captioned with the URL it came from), and export everything as a zip.
 
-Router screenshotting is one of three **scan types** available at a site — `wifi_scan` (nearby
-WiFi networks) and `bluetooth_scan` (nearby BLE devices) round out a full on-site survey, both via
-the same Sites → Scans model and results/export UI. See "Extending with new scan types" below for
-how a scan type plugs in.
+Router screenshotting is one of four **scan types** available at a site — `wifi_scan` (nearby WiFi
+networks), `bluetooth_scan` (nearby BLE devices), and `network_devices_scan` (devices actually on
+one specific WiFi network, picked from a `wifi_scan`'s results) round out a full on-site survey,
+all via the same Sites → Scans model and results/export UI. See "Extending with new scan types"
+below for how a scan type plugs in.
 
 **Linux only, by design, with no plans to change.** `wifi_scan` shells out to `nmcli`
 (NetworkManager) and `bluetooth_scan` uses `bleak` over BlueZ's D-Bus API — both Linux-specific.
@@ -134,6 +135,26 @@ check. Same passive/read-only reasoning as WiFi scanning applies: nothing here c
 discovered device, it's listening for advertisements only. If no adapter/daemon is reachable, the
 scan fails with bleak's D-Bus error rather than hanging or silently returning zero devices.
 
+### Scanning devices on a specific network
+
+Not a directly-selectable scan type in the New Scan form — instead, open a completed `wifi_scan`'s
+results and click "Scan devices" on a specific network's row. That starts a
+`network_devices_scan` targeting that SSID and shows a table of what it finds (IP, MAC, hostname).
+
+You have to actually be joined to that WiFi network first (this scans the local subnet you're
+currently on — it can't reach out to some other network you merely detected). The scan checks
+this itself before doing anything: it reads which network you're currently connected to via
+`nmcli` and refuses with a clear error if it doesn't match the SSID you clicked.
+
+Discovery technique: ping every candidate address on your subnet once (concurrently, capped at a
+2048-host safety limit) to populate the kernel's ARP/neighbor cache, then read it back via `ip
+neighbor show`. This finds a host even if it doesn't answer ICMP itself — resolving an address's
+MAC via ARP is a prerequisite of the kernel even attempting local-segment delivery, so just trying
+to reach it triggers that regardless of whether the ping itself gets a reply. No root or raw
+sockets needed, unlike `arp-scan`/`nmap`'s ARP-scan mode. Hostnames are filled in via a best-effort
+reverse DNS lookup per device (works when a router's DHCP integrates with local DNS, which many
+consumer routers do; otherwise left blank). Export includes a `devices.csv`.
+
 ## Testing
 
 No live router or running server needed for the unit tests:
@@ -160,6 +181,11 @@ python3 -m unittest discover tests -v
 - `test_bluetooth_parse.py` — the Bluetooth scan's device-record normalizer (manufacturer ID hex
   formatting, missing-data defaults). No real adapter needed — `scanners/bluetooth_scan.py` can
   likewise be run directly to sanity-check the full loop.
+- `test_lan_devices_parse.py` — the network-devices scan's `nmcli`/`ip neighbor` parsers and
+  subnet math (host enumeration excluding network/broadcast/self). The underlying ping-sweep +
+  `ip neighbor` discovery technique itself was verified against a real live subnet during
+  development (real hosts, real MACs, zero root needed) — that part isn't something a unit test
+  can exercise without real network access, so it isn't re-asserted here.
 
 For an end-to-end check, run the backend and a small local page (or router) that has a login form
 and a couple of linked pages, submit a scan through the GUI, and confirm the gallery + export
@@ -173,9 +199,15 @@ as long as it writes `manifest.json` and any output files into `scan_dir/artifac
 in `backend/runners/__init__.py`'s `RUNNERS` map and add an entry to `SCAN_TYPES` in
 `frontend/app.js` — no other backend or frontend code needs to change.
 
-`wifi_scan` and `bluetooth_scan` (`backend/runners/{wifi,bluetooth}_scan.py` +
-`scanners/{wifi,bluetooth}_scan.py`) are two examples of the same pattern beyond
-`router_screenshot` — both scan from the machine physically present at the site rather than a
-remote URL, and need no Scrapy/Playwright at all, just a subprocess shelling out to `nmcli`/bleak
-respectively. A future scan type follows the same shape: a runner + a script, registered in one
-place, no changes needed to `backend/sites.py`, `backend/scans.py`, or the frontend shell.
+`wifi_scan`, `bluetooth_scan`, and `network_devices_scan` (`backend/runners/*.py` +
+`scanners/*.py`) are examples of the same pattern beyond `router_screenshot` — all scan from the
+machine physically present at the site rather than a remote URL, and need no Scrapy/Playwright at
+all, just a subprocess shelling out to `nmcli`/bleak/`ip`. A future scan type follows the same
+shape: a runner + a script, registered in one place, no changes needed to `backend/sites.py` or
+`backend/scans.py`.
+
+A scan type also doesn't have to be directly selectable in the New Scan form's dropdown —
+`network_devices_scan` isn't; it's only reachable via a "Scan devices" button on a `wifi_scan`'s
+results (`frontend/app.js`'s `scanDevicesButton`), since it only makes sense once you know which
+SSID to target. `SCAN_TYPES` controls what shows up in that dropdown; a runner registered in
+`RUNNERS` without a `SCAN_TYPES` entry is simply launched some other way in the UI.
