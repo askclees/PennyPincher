@@ -497,18 +497,23 @@ const TABLE_COLUMNS = {
 
 function renderGallery(siteId, scanId, pages) {
   const gallery = el("div", { class: "gallery" });
-  for (const page of pages) {
-    const src = `/sites/${siteId}/scans/${scanId}/artifacts/${page.screenshot_file}`;
-    const img = el("img", { src, alt: page.title || page.url, onclick: () => openLightbox(src) });
+  const images = pages.map((page) => ({
+    src: `/sites/${siteId}/scans/${scanId}/artifacts/${page.screenshot_file}`,
+    title: page.title || "(untitled)",
+    url: page.url,
+  }));
+
+  images.forEach((image, index) => {
+    const img = el("img", { src: image.src, alt: image.title, onclick: () => openLightbox(images, index) });
     const figure = el("figure", {}, [
       img,
       el("figcaption", {}, [
-        el("span", { class: "title", text: page.title || "(untitled)" }),
-        el("span", { class: "url", text: page.url }),
+        el("span", { class: "title", text: image.title }),
+        el("span", { class: "url", text: image.url }),
       ]),
     ]);
     gallery.appendChild(figure);
-  }
+  });
   return gallery;
 }
 
@@ -528,7 +533,43 @@ function renderTable(rows, columns, context = {}) {
   return table;
 }
 
-function openLightbox(src) {
-  const overlay = el("div", { class: "lightbox", onclick: () => overlay.remove() }, [el("img", { src })]);
+// `images` is the full gallery ([{src, title, url}, ...]) so Left/Right (or the on-screen ‹ ›
+// buttons) can step through every screenshot without closing back out to the grid each time —
+// only Escape / the × button / clicking the dimmed background closes it.
+function openLightbox(images, startIndex) {
+  let current = startIndex;
+
+  const imgEl = el("img", { src: images[current].src, alt: images[current].title });
+  const caption = el("div", { class: "lightbox-caption" });
+  const stop = (fn) => (e) => { e.stopPropagation(); fn(); };
+
+  function show(index) {
+    current = (index + images.length) % images.length; // wraps around both ends
+    const image = images[current];
+    imgEl.src = image.src;
+    imgEl.alt = image.title;
+    caption.textContent = `${current + 1} / ${images.length} — ${image.title}`;
+  }
+  show(current);
+
+  function close() {
+    document.removeEventListener("keydown", onKeydown);
+    overlay.remove();
+  }
+
+  function onKeydown(e) {
+    if (e.key === "Escape") close();
+    else if (e.key === "ArrowRight") show(current + 1);
+    else if (e.key === "ArrowLeft") show(current - 1);
+  }
+
+  const overlay = el("div", { class: "lightbox", onclick: close }, [
+    el("button", { class: "lightbox-close", onclick: stop(close), text: "×" }),
+    images.length > 1 && el("button", { class: "lightbox-nav lightbox-prev", onclick: stop(() => show(current - 1)), text: "‹" }),
+    el("div", { class: "lightbox-content", onclick: (e) => e.stopPropagation() }, [imgEl, caption]),
+    images.length > 1 && el("button", { class: "lightbox-nav lightbox-next", onclick: stop(() => show(current + 1)), text: "›" }),
+  ].filter(Boolean));
+
+  document.addEventListener("keydown", onKeydown);
   document.body.appendChild(overlay);
 }
